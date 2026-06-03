@@ -1,0 +1,193 @@
+## Master Prompt
+
+Build a full-stack web application following the exact architecture, design system, and code conventions below. These patterns are domain-agnostic — whether the app is for inventory, HR, CRM, billing, or anything else, apply them consistently.
+
+---
+
+### 1. Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + Vite 5 (`@vitejs/plugin-react`) |
+| Routing | `react-router-dom` v6 |
+| HTTP client | `axios` with interceptors for auth token & 401 redirect |
+| Notifications | `react-hot-toast` (top-right, 3s, dark style) |
+| Styling | Tailwind CSS via PostCSS — utility classes only, no CSS modules/styled-components |
+| Backend | Node.js + Express |
+| Database | MongoDB via Mongoose |
+| Auth | JWT (`jsonwebtoken`), Bearer token in `localStorage` |
+| Validation | `express-validator` on backend; custom validation utils on frontend |
+| Language | JavaScript (`.js` backend, `.jsx` frontend) |
+
+---
+
+### 2. Project Structure
+
+```
+backend/
+├── server.js              # Entry: cors, json, routes, 404 handler, errorHandler
+├── config/
+│   └── db.js              # Mongoose connection
+├── models/
+│   └── *.js               # Mongoose schemas with timestamps
+├── controllers/
+│   └── *Controller.js     # { create, getAll, getOne, update, delete } pattern
+├── routes/
+│   └── *.js               # express.Router(), auth middleware on protected routes
+├── middleware/
+│   ├── auth.js            # Bearer token → jwt.verify
+│   ├── validate.js        # express-validator chains + handleValidationErrors
+│   └── errorHandler.js    # CastError, ValidationError, 11000, JWT, generic 500
+└── database/
+    └── seed.js            # Standalone seed script
+
+frontend/
+├── vite.config.mjs        # port: 3000
+├── tailwind.config.js     # primary: #374151 (gray-700)
+├── src/
+│   ├── main.jsx           # BrowserRouter + StrictMode
+│   ├── index.css          # Tailwind directives + body base + scrollbar
+│   ├── App.jsx            # AuthProvider → Toaster → Routes (ProtectedRoute/PublicRoute)
+│   ├── api/
+│   │   └── axios.js       # baseURL, auth interceptor, 401 redirect
+│   ├── utils/
+│   │   └── validation.js  # validateRequired, validateMinLength, etc.
+│   ├── context/
+│   │   └── AuthContext.jsx # login, register, logout, user, token, loading
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── Table.jsx       # columns[], data[], loading, emptyTitle, emptyDescription, renderActions
+│   │   │   ├── Modal.jsx       # isOpen, onClose, onConfirm, title, message, confirmText, variant ('danger')
+│   │   │   ├── Loading.jsx     # size (sm|md|lg) + optional message
+│   │   │   └── EmptyState.jsx  # title + description
+│   │   └── layout/
+│   │       ├── Layout.jsx      # Sidebar + mobile header + main content
+│   │       └── Sidebar.jsx     # navItems[], NavLink per route, user section, Logout
+│   └── pages/                 # One per route, PascalCase.jsx
+│       ├── Landing.jsx
+│       ├── Login.jsx
+│       ├── Register.jsx
+│       ├── PasswordReset.jsx
+│       ├── Dashboard.jsx
+│       ├── {Entity}List.jsx    # CRUD page for each entity
+│       ├── Reports.jsx
+│       └── Profile.jsx
+```
+
+---
+
+### 3. Design System
+
+**Colors — muted gray palette. No bright blues:**
+- Primary: `bg-gray-800`, `bg-gray-600` (active nav)
+- Text: `text-gray-900` (headings), `text-gray-500/400` (muted), `text-gray-700` (body)
+- Borders: `border-gray-100/200/300`
+- Focus ring: `focus:ring-gray-400`
+- Background: `bg-gray-50` (page), `bg-white` (cards)
+- Danger: `bg-red-600 text-white`, `text-red-600`, `hover:text-red-600 hover:bg-red-50`
+- Edit icon: `text-gray-400 hover:text-blue-600 hover:bg-blue-50`
+- Links: `text-gray-500 hover:text-gray-700 hover:underline`
+
+**Reusable component patterns:**
+```html
+<!-- Card -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+
+<!-- Page heading -->
+<div>
+  <h1 class="text-2xl font-bold text-gray-900">Title</h1>
+  <p class="text-sm text-gray-500 mt-1">Subtitle</p>
+</div>
+
+<!-- Input -->
+<input class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent" />
+<!-- Error: border-red-400, error text below: <p class="mt-1 text-xs text-red-500">Error</p> -->
+
+<!-- Primary button -->
+<button class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
+
+<!-- Secondary button -->
+<button class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+
+<!-- Modal overlay -->
+<div class="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-40" onClick={onClose} />
+  <div class="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-auto z-10">
+
+<!-- Search input -->
+<div class="relative">
+  <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" ... />
+  <input type="text" placeholder="Search..." class="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 w-full" />
+</div>
+```
+
+---
+
+### 4. CRUD Page Pattern (every entity list page)
+
+Each entity's list page follows this exact structure:
+
+```
+State: [items], [loading], [showForm], [editing], [form], [errors], [submitting], [deleteTarget], [searchTerm]
+  + [referenceData] if entity has foreign-key references
+
+fetchItems — useCallback, useEffect on mount
+
+Table columns: [{ key, label, sortable?, render? }]
++ actions column with edit (blue hover) / delete (red hover) buttons
+
+Form: overlay modal, grid-cols-1 sm:grid-cols-2 gap-4
+  label * for required fields
+  validation: iterate fields array, collect errors
+  submit: validate → setSubmitting → API call → toast → reset → refetch
+
+Delete: Modal confirm → API delete → toast → close → refetch
+
+Search: client-side .toLowerCase().includes(term)
+
+Edit: openEdit sets editing + fills form from row data
+```
+
+---
+
+### 5. Backend API Pattern
+
+- **Controllers:** `{ create, getAll, getOne, update, delete }` — all `async (req, res, next)` with try/catch → `next(error)`
+- **Duplicates:** explicit `findOne` checks before create/update
+- **Delete protection:** check for child records before deleting
+- **Validation:** `express-validator` chains + `handleValidationErrors` middleware
+- **Auth route pattern:** `router.post('/', auth, validation, controller.method)`
+- **Response envelope:** `{ success: boolean, message: string, data?: any }`
+- **Auth response:** `{ token, user: { id, fullName, username } }`
+- **Recovery token:** `crypto.randomBytes(4).toString('hex').toUpperCase()`, stored on User, returned on register, validated on forgot-password
+
+---
+
+### 6. Auth & Routing Flow
+
+- AuthContext manages `{ user, token, loading, login, register, logout, isAuthenticated }`
+- `ProtectedRoute` = `loading → Loading` | `!isAuthenticated → Navigate /login` | `<Layout><Page /></Layout>`
+- `PublicRoute` = `loading → Loading` | `isAuthenticated → Navigate /dashboard` | `<Page />`
+- Axios interceptor: attaches Bearer token, on 401 clears auth + redirects to `/login`
+- Toaster rendered once in App, no toast calls in individual pages beyond `toast.success / toast.error`
+
+---
+
+### 7. Consistency Rules (non-negotiable)
+
+- `import React from 'react'` at top of every `.jsx` file
+- No comments in production code
+- No emojis in code or UI unless explicitly requested
+- Every form field has `<label>` with `*` for required
+- Error text: `className="mt-1 text-xs text-red-500"`
+- All API responses: `{ success: boolean, message: string, data?: any }`
+- Colors stay muted grays — `bg-gray-800` for primary, `#374151` as brand primary
+- Currency / monetary values: prefix with `RWF ` (or adapt per domain), use `Number(val).toLocaleString()`
+- Total price / computed columns rendered in table as `col.render`
+- CSV export: build rows array, join with commas, create Blob + download link
+- Reports: tab bar with date controls inline on the same row, report title below, summary cards, then transaction/record table
+- Sidebar: `navItems[]` array with `{ label, path, icon }`, NavLink with `isActive` styling
+
+---
+
+Copy everything above. When given a new business scenario (e.g. an HR system, a library manager, a billing platform), replace the domain-specific entities and business rules while preserving the entire structural blueprint, design language, workflow patterns, and architectural decisions.
